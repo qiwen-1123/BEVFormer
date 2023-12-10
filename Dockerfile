@@ -1,4 +1,4 @@
-ARG CUDA_VERSION=11.3.1
+ARG CUDA_VERSION=11.1.1
 ARG OS_VERSION=20.04
 # pull a prebuilt image
 FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-devel-ubuntu${OS_VERSION}
@@ -74,7 +74,8 @@ ENV FORCE_CUDA="1"
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/miniconda3/envs/bin:$PATH
 
 # install pytorch
-RUN pip install torch==1.9.1+cu111 torchvision==0.10.1+cu111 torchaudio==0.9.1 -f https://download.pytorch.org/whl/torch_stable.html
+# RUN pip install torch==1.9.1+cu111 torchvision==0.10.1+cu111 torchaudio==0.9.1 -f https://download.pytorch.org/whl/torch_stable.html
+RUN pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
 
 # install opencv
 RUN python -m pip install opencv-python==4.5.5.62
@@ -105,11 +106,13 @@ ENV CMAKE_PREFIX_PATH="$(dirname $(which conda))/../"
 RUN apt-get update && apt-get install -y ffmpeg libsm6 libxext6 git ninja-build libglib2.0-0 libsm6 libxrender-dev libxext6 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-RUN git clone https://github.com/open-mmlab/mmdetection3d.git && \
+RUN mkdir /BevFormer && cd /BevFormer && git clone https://github.com/open-mmlab/mmdetection3d.git && \
     cd mmdetection3d && \
     git checkout v0.17.1 && \
-    python -m pip install -r requirements/build.txt && \
-    python -m pip install --no-cache-dir -e .
+    # python setup.py install
+    pip install -e .
+    # python -m pip install -r requirements/build.txt && \
+    # python -m pip install --no-cache-dir -e .
 
 # install timm
 RUN python -m pip install timm
@@ -121,6 +124,6 @@ RUN pip install seaborn==0.12.0
 # libraries path
 RUN ln -s /usr/local/cuda/lib64/libcusolver.so.11 /usr/local/cuda/lib64/libcusolver.so.10
 
-WORKDIR /home
+WORKDIR /BevFormer
 
 RUN ["/bin/bash"]
