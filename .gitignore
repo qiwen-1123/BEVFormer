@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 .vscode
 mmdetection3d
+outputs
 # C extensions
 *.so
 
