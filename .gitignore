@@ -5,6 +5,7 @@ __pycache__/
 .vscode
 mmdetection3d
 outputs
+SemSeg_data/*
 # C extensions
 *.so
 

@@ -27,7 +27,7 @@ from nuscenes.eval.detection.utils import category_to_detection_name
 from nuscenes.eval.detection.render import visualize_sample
 
 import os
-
+import torch
 
 cams = ['CAM_FRONT',
  'CAM_FRONT_RIGHT',
@@ -353,7 +353,8 @@ def render_2d(
                view: np.ndarray = np.eye(3),
                normalize: bool = False,
                colors: Tuple = ('b', 'r', 'k'),
-               linewidth: float = 2) -> None:
+               linewidth: float = 2,
+               sem_seg=None) -> None:
         """
         Renders the box in the provided Matplotlib axis.
         :param axis: Axis onto which the box should be drawn.
@@ -377,6 +378,10 @@ def render_2d(
             for corner in selected_corners:
                 axis.plot([prev[0], corner[0]], [prev[1], corner[1]], color=color, linewidth=linewidth)
                 prev = corner
+        if sem_seg!=None:
+            cropped_region = sem_seg[:,int(y_min):int(y_max), int(x_min):int(x_max)]
+            sem_mean = torch.mean(cropped_region.float(), dim=(1, 2))
+            cls = torch.argmax(sem_mean)
 
 
         draw_rect(corners_2d.T, colors[0])
@@ -441,6 +446,8 @@ def render_sample_data(
         _, ax = plt.subplots(4, 3, figsize=(24, 18))
     j = 0
     for ind, cam in enumerate(cams):
+        sem_seg_data = torch.load(os.path.join("SemSeg_data", sample_toekn + "_" + cam + "_" + "catseg.pth")) # Class * H * W (e.g. 17*900*1600 for nuscenes)
+        
         sample_data_token = sample['data'][cam]
 
         sd_record = nusc.get('sample_data', sample_data_token)
@@ -475,7 +482,7 @@ def render_sample_data(
                 for box in boxes_pred:
                     c = np.array(get_color(box.name)) / 255.0
                     # box.render(ax[j, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c))
-                    render_2d(box.corners(), ax[j, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c))
+                    render_2d(box.corners(), ax[j, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c), sem_seg= sem_seg_data)
                 for box in boxes_gt:
                     c = np.array(get_color(box.name)) / 255.0
                     # box.render(ax[j + 2, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c))
