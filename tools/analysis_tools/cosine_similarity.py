@@ -26,16 +26,6 @@ def adjust_dimensions(matrix1, matrix2):
 
     return padded_matrix1, padded_matrix2
 
-def zero_padding(matrix, target_shape):
-    # 计算在每个维度上的 padding 大小
-    padding_height = max(target_shape[0] - matrix.shape[0], 0)
-    padding_width = max(target_shape[1] - matrix.shape[1], 0)
-
-    # 使用 numpy 进行 zero-padding
-    padded_matrix = np.pad(matrix, ((0, padding_height), (0, padding_width)), mode='constant', constant_values=0)
-
-    return padded_matrix
-
 def cosine_similarity(matrix1, matrix2):
     # padding to same dim
     matrix1, matrix2 = adjust_dimensions(matrix1, matrix2)
@@ -46,7 +36,7 @@ def cosine_similarity(matrix1, matrix2):
     # 使用PyTorch的cosine_similarity计算余弦相似度
     similarity = F.cosine_similarity(vector1, vector2, dim=0)
 
-    return similarity.item()
+    return round(similarity.item(), 2)
 
 if __name__ == '__main__':
     seed = 42

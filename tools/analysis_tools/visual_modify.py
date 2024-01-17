@@ -510,17 +510,31 @@ class Viusal_tool():
                         
                 # Calculate Cosine Similarity between each 2dbbox
                 for box_index, box2d in enumerate(box2d_pred_list):
+                    if box_index>0: # only show the similarity regarding the first bbox with all other boxes
+                        break
+                    
                     print(f"Similarity calculations for box2d {box_index}:")
                     cls_curr = box2d["clip_label"]
                     cropped_region_curr = box2d["cropped_region"][cls_curr,:] # get the cls with largest confidence
+                    
+                    center_x = np.mean(box2d["corner"][0, :])
+                    center_y = np.mean(box2d["corner"][1, :])              
+                    ax[j, ind].text(center_x, center_y, "current", color='red', ha='center', va='center', fontsize=10)
 
                     for box_index_other, other_box2d in enumerate(box2d_pred_list):
-                        if box_index != box_index_other and box2d["label"]!=other_box2d["label"]:
+                        if box_index != box_index_other:
+                            # and box2d["label"]!=other_box2d["label"]:
                             cls_other = other_box2d["clip_label"]
-                            cropped_region_other = other_box2d["cropped_region"][cls_curr,:] # get the cls with largest confidence, try the same channel with curr
+                            cropped_region_other = other_box2d["cropped_region"][cls_curr,:] #compare the same channel with curr
                             # Calcuate similarity
                             similarity = cosine_similarity(cropped_region_curr, cropped_region_other)
+                            # show the similarity in the center of xbox
+                            center_x = np.mean(other_box2d["corner"][0, :])
+                            center_y = np.mean(other_box2d["corner"][1, :])              
+                            ax[j, ind].text(center_x, center_y, str(similarity), color='red', ha='center', va='center', fontsize=10)
+
                             print("similarity is: ", similarity)
+                    print(f"Similarity calculations for box2d {box_index}: Done")
 
                 # Limit visible range.
                 ax[j, ind].set_xlim(0, data.size[0])
@@ -558,6 +572,6 @@ if __name__ == '__main__':
     if not os.path.exists(out_folder):
                         os.makedirs(out_folder)
     visual = Viusal_tool(pred_data=bevformer_results, sample_token_list=sample_token_list, out_folder=out_folder, version = bevformer_version)
-    for id in range(5,6):
+    for id in range(6):
         visual.render_sample_data(id)
         # visual.render_sample_data(sample_token_list[id], pred_data=bevformer_results, out_path= os.path.join(out_foler, sample_token_list[id]))
