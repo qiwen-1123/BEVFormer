@@ -28,6 +28,9 @@ from nuscenes.eval.detection.render import visualize_sample
 
 import os
 import torch
+import torch.nn.functional as F
+
+from cosine_similarity import cosine_similarity
 
 cams = ['CAM_FRONT',
  'CAM_FRONT_RIGHT',
@@ -149,8 +152,6 @@ class Viusal_tool():
         if out_path is not None:
             plt.savefig(out_path)
 
-
-
     def get_sample_data(self,sample_data_token: str,
                         box_vis_level: BoxVisibility = BoxVisibility.ANY,
                         selected_anntokens=None,
@@ -211,8 +212,6 @@ class Viusal_tool():
             box_list.append(box)
 
         return data_path, box_list, cam_intrinsic
-
-
 
     def get_predicted_data(self,sample_data_token: str,
                         box_vis_level: BoxVisibility = BoxVisibility.ANY,
@@ -276,9 +275,6 @@ class Viusal_tool():
 
         return data_path, box_list, cam_intrinsic
 
-
-
-
     def lidiar_render(self,sample_token, data,out_path=None):
         bbox_gt_list = []
         bbox_pred_list = []
@@ -323,7 +319,6 @@ class Viusal_tool():
         print('blue is the predited result')
         visualize_sample(nusc, sample_token, gt_annotations, pred_annotations, savepath=out_path+'_bev')
 
-
     def get_color(self,category_name: str):
         """
         Provides the default colors based on the category names.
@@ -354,15 +349,15 @@ class Viusal_tool():
                 return nusc.colormap[key]
         return [0, 0, 0]
 
-    def render_2d( self,
-                corners,
+    def get_bbox2d( self,
+                box3d,
                 axis: Axes,
                 view: np.ndarray = np.eye(3),
                 normalize: bool = False,
                 colors: Tuple = ('b', 'r', 'k'),
                 linewidth: float = 2,
                 sem_seg=None,
-                save_2dbox: bool = False,) -> None:
+                ) -> None:
             """
             Renders the box in the provided Matplotlib axis.
             :param axis: Axis onto which the box should be drawn.
@@ -372,31 +367,38 @@ class Viusal_tool():
                 back and sides.
             :param linewidth: Width in pixel of the box sides.
             """
-            corners = view_points(corners, view, normalize=normalize)[:2, :]
+            label = box3d.name
+            clip_label = None
             
-            x_max = corners[0,:].max()
-            x_min = corners[0,:].min()
-            y_max = corners[1,:].max()
-            y_min = corners[1,:].min()
+            corners = box3d.corners()
+            corners_3d_inImage = view_points(corners, view, normalize=normalize)[:2, :] # the 8 corners of a 3d bbox in image
+            
+            x_max = corners_3d_inImage[0,:].max()
+            x_min = corners_3d_inImage[0,:].min()
+            y_max = corners_3d_inImage[1,:].max()
+            y_min = corners_3d_inImage[1,:].min()
             
             corners_2d = np.array([[x_max, x_min, x_min, x_max, ],[y_min, y_min, y_max, y_max]])
-            if save_2dbox == True:
-                np.save('test/bevformer_small/origin_trained/pts_bbox/2dbox.npy', corners_2d)
-                
+            if sem_seg!=None:
+                cropped_region = sem_seg[:,int(y_min):int(y_max), int(x_min):int(x_max)]
+                sem_mean = torch.mean(cropped_region.float(), dim=(1, 2))
+                clip_label = int(torch.argmax(sem_mean))
 
             def draw_rect(selected_corners, color):
                 prev = selected_corners[-1]
                 for corner in selected_corners:
                     axis.plot([prev[0], corner[0]], [prev[1], corner[1]], color=color, linewidth=linewidth)
                     prev = corner
-            if sem_seg!=None:
-                cropped_region = sem_seg[:,int(y_min):int(y_max), int(x_min):int(x_max)]
-                sem_mean = torch.mean(cropped_region.float(), dim=(1, 2))
-                cls = torch.argmax(sem_mean)
-
-
+                    
             draw_rect(corners_2d.T, colors[0])
             # plt.show()
+            box2d = {
+                "corner": corners_2d,  # 2d corners
+                "label": label,        # class label from detection
+                "clip_label": clip_label if clip_label is not None else None, # class label from clip
+                "cropped_region": cropped_region if clip_label is not None else None
+            }    
+            return box2d
 
     def render_sample_data(
             self,
@@ -451,8 +453,8 @@ class Viusal_tool():
         sample = nusc.get('sample', sample_toekn)
         # sample = data['results'][sample_token_list[0]][0]
         cams = [
-            # 'CAM_FRONT_LEFT',
-            'CAM_FRONT',
+            'CAM_FRONT_LEFT',
+            # 'CAM_FRONT',
             # 'CAM_FRONT_RIGHT',
             # 'CAM_BACK_LEFT',
             # 'CAM_BACK',
@@ -462,9 +464,10 @@ class Viusal_tool():
             _, ax = plt.subplots(4, 3, figsize=(24, 18))
         j = 0
         for ind, cam in enumerate(cams):
-            sem_seg_data = torch.load(os.path.join("SemSeg_data", sample_toekn + "_" + cam + "_" + "catseg.pth")) # Class * H * W (e.g. 17*900*1600 for nuscenes)
             
             sample_data_token = sample['data'][cam]
+            sem_seg_data = torch.load(os.path.join("SemSeg_data", sample_data_token + ".pth")) # Class * H * W (e.g. 17*900*1600 for nuscenes)
+            box2d_pred_list=[]
 
             sd_record = nusc.get('sample_data', sample_data_token)
             sensor_modality = sd_record['sensor_modality']
@@ -475,7 +478,7 @@ class Viusal_tool():
                 # Load boxes and image.
                 boxes = [Box(record['translation'], record['size'], Quaternion(record['rotation']),
                             name=record['detection_name'], token='predicted') for record in
-                        pred_data['results'][sample_toekn] if record['detection_score'] > 0.15]
+                        pred_data['results'][sample_toekn] if record['detection_score'] > 0.2]
 
                 data_path, boxes_pred, camera_intrinsic = self.get_predicted_data(sample_data_token,
                                                                             box_vis_level=box_vis_level, pred_anns=boxes)
@@ -498,11 +501,26 @@ class Viusal_tool():
                     for box in boxes_pred:
                         c = np.array(self.get_color(box.name)) / 255.0
                         # box.render(ax[j, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c))
-                        self.render_2d(box.corners(), ax[j, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c), sem_seg= sem_seg_data)
+                        box2d_pred = self.get_bbox2d(box, ax[j, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c), sem_seg= sem_seg_data)
+                        box2d_pred_list.append(box2d_pred)
                     for box in boxes_gt:
                         c = np.array(self.get_color(box.name)) / 255.0
                         # box.render(ax[j + 2, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c))
-                        self.render_2d(box.corners(), ax[j + 2, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c))
+                        box2d_gt = self.get_bbox2d(box, ax[j + 2, ind], view=camera_intrinsic, normalize=True, colors=(c, c, c))
+                        
+                # Calculate Cosine Similarity between each 2dbbox
+                for box_index, box2d in enumerate(box2d_pred_list):
+                    print(f"Similarity calculations for box2d {box_index}:")
+                    cls_curr = box2d["clip_label"]
+                    cropped_region_curr = box2d["cropped_region"][cls_curr,:] # get the cls with largest confidence
+
+                    for box_index_other, other_box2d in enumerate(box2d_pred_list):
+                        if box_index != box_index_other and box2d["label"]!=other_box2d["label"]:
+                            cls_other = other_box2d["clip_label"]
+                            cropped_region_other = other_box2d["cropped_region"][cls_curr,:] # get the cls with largest confidence, try the same channel with curr
+                            # Calcuate similarity
+                            similarity = cosine_similarity(cropped_region_curr, cropped_region_other)
+                            print("similarity is: ", similarity)
 
                 # Limit visible range.
                 ax[j, ind].set_xlim(0, data.size[0])
@@ -540,6 +558,6 @@ if __name__ == '__main__':
     if not os.path.exists(out_folder):
                         os.makedirs(out_folder)
     visual = Viusal_tool(pred_data=bevformer_results, sample_token_list=sample_token_list, out_folder=out_folder, version = bevformer_version)
-    for id in range(0, 2):
+    for id in range(5,6):
         visual.render_sample_data(id)
         # visual.render_sample_data(sample_token_list[id], pred_data=bevformer_results, out_path= os.path.join(out_foler, sample_token_list[id]))
