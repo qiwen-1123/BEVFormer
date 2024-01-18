@@ -1,4 +1,4 @@
-# BEvFormer-small_2D consumes at lease 10500M GPU memory
+# BEvFormer-small_Clip consumes at lease 10500M GPU memory
 # compared to bevformer_base, bevformer_small has
 # smaller BEV: 200*200 -> 150*150
 # less encoder layers: 6 -> 3
@@ -44,7 +44,7 @@ bev_w_ = 150
 queue_length = 3 # each sequence contains `queue_length` frames.
 
 model = dict(
-    type='BEVFormer_2D',
+    type='BEVFormer_Clip',
     use_grid_mask=True,
     video_test_mode=True,
     img_backbone=dict(
@@ -68,7 +68,7 @@ model = dict(
         num_outs=_num_levels_,
         relu_before_extra_convs=True),
     pts_bbox_head=dict(
-        type='BEVFormerHead_2D',
+        type='BEVFormerHead_Clip',
         bev_h=bev_h_,
         bev_w=bev_w_,
         num_query=900,
@@ -167,7 +167,7 @@ model = dict(
             iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head.
             pc_range=point_cloud_range))))
 
-dataset_type = 'CustomNuScenesDataset'
+dataset_type = 'CustomNuScenesDataset_Clip'
 data_root = 'data/nuscenes/'
 file_client_args = dict(backend='disk')
 

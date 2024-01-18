@@ -12,6 +12,6 @@
 
 # Code Modification
 ## new Detection Head
-1. new .py file `projects/mmdet3d_plugin/bevformer/dense_heads/bevformer_head_2D.py` for projecting 3D BBox into 2D image
-2. new .py file `projects/mmdet3d_plugin/bevformer/detectors/bevformer_2D.py` modify original bevformer with 2D Head
-3. new config file `projects/configs/bevformer/bevformer_small_2D.py` config file for 2D version
+1. new .py file `projects/mmdet3d_plugin/bevformer/dense_heads/bevformer_head_Clip.py` for projecting 3D BBox into 2D image
+2. new .py file `projects/mmdet3d_plugin/bevformer/detectors/bevformer_Clip.py` modify original bevformer with 2D Head
+3. new config file `projects/configs/bevformer/bevformer_small_Clip.py` config file for 2D version

@@ -18,7 +18,7 @@ from projects.mmdet3d_plugin.models.utils.bricks import run_time
 
 
 @DETECTORS.register_module()
-class BEVFormer_2D(MVXTwoStageDetector):
+class BEVFormer_Clip(MVXTwoStageDetector):
     """BEVFormer.
     Args:
         video_test_mode (bool): Decide whether to use temporal information during inference.
@@ -43,7 +43,7 @@ class BEVFormer_2D(MVXTwoStageDetector):
                  video_test_mode=False
                  ):
 
-        super(BEVFormer_2D,
+        super(BEVFormer_Clip,
               self).__init__(pts_voxel_layer, pts_voxel_encoder,
                              pts_middle_encoder, pts_fusion_layer,
                              img_backbone, pts_backbone, img_neck, pts_neck,
